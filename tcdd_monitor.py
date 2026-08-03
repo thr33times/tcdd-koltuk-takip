@@ -347,7 +347,7 @@ def format_message(items: list[dict[str, Any]]) -> str:
     for item in items:
         lines.append(
             f"• {item['departure']} — YHT {item['train']} — "
-            f"{item['class']}: {item['count']}"
+            f"{item['class']}: {item['count']} normal koltuk"
         )
     lines.extend(
         [
