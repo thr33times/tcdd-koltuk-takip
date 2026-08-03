@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import re
 import sys
+import time
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -306,7 +308,7 @@ def inspect_trains(page: Page) -> list[dict[str, Any]]:
         except Exception:
             click_train_card(page, train_button)
 
-        page.wait_for_timeout(400)
+        page.wait_for_timeout(random.randint(700, 1400))
         class_counts = class_details_for_row(page, row)
         print(
             f"Sonuç: Ekonomi={class_counts['EKONOMI']}, "
@@ -328,7 +330,7 @@ def inspect_trains(page: Page) -> list[dict[str, Any]]:
         # Collapse before inspecting the next card when possible.
         try:
             click_train_card(page, train_button)
-            page.wait_for_timeout(200)
+            page.wait_for_timeout(random.randint(400, 800))
         except Exception:
             # A failed collapse is harmless; the next click still waits for
             # the site's loading overlay to finish.
@@ -396,6 +398,13 @@ def main() -> int:
 
     available: list[dict[str, Any]] = []
 
+    delay_seconds = random.randint(20, 90)
+    print(
+    f"TCDD kontrolünden önce {delay_seconds} saniye bekleniyor.",
+    flush=True,
+    )
+    time.sleep(delay_seconds)
+
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(
             headless=True,
@@ -415,7 +424,21 @@ def main() -> int:
         page.set_default_timeout(10_000)
 
         try:
-            page.goto(BASE_URL, wait_until="domcontentloaded", timeout=60_000)
+            response = page.goto(
+                BASE_URL,
+                wait_until="domcontentloaded",
+                timeout=60_000,
+            )
+            
+            if response and response.status in {403, 429}:
+                print(
+                    f"TCDD erişimi sınırlandırdı: HTTP {response.status}. "
+                    "Bu çalışmada tekrar denenmeyecek.",
+                    flush=True,
+                )
+                return 0
+
+            
             page.locator("#fromTrainInput").wait_for(state="visible", timeout=30_000)
 
             click_first_visible(
