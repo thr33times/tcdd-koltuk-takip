@@ -1,0 +1,83 @@
+name: TCDD Koltuk Takibi
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_notification:
+        description: "Sadece Telegram test bildirimi gönder"
+        required: false
+        default: false
+        type: boolean
+
+  schedule:
+    - cron: "2-57/5 * 3-9 8 *"
+      timezone: "Europe/Istanbul"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tcdd-seat-monitor
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Kodu indir
+        uses: actions/checkout@v6
+
+      - name: Python kur
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Paketleri kur
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Önceki bildirim durumunu yükle
+        uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: tcdd-state-${{ github.run_id }}
+          restore-keys: |
+            tcdd-state-
+
+      - name: TCDD'yi kontrol et
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TEST_NOTIFICATION: ${{ inputs.test_notification && '1' || '0' }}
+          TCDD_ORIGIN: "İZMİT YHT"
+          TCDD_DESTINATION: "ANKARA GAR"
+          TCDD_DATE: "09.08.2026"
+          TCDD_MIN_TIME: "17:02"
+        run: python tcdd_monitor.py
+
+      - name: Bildirim durumunu kaydet
+        if: always()
+        run: test -f state.json || echo '{"last_signature": ""}' > state.json
+
+      - name: Durum önbelleğini sakla
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: tcdd-state-${{ github.run_id }}
+
+      - name: Hata ekranını yükle
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tcdd-debug-${{ github.run_id }}
+          path: |
+            debug.png
+            debug.html
+          if-no-files-found: ignore
+          retention-days: 3
