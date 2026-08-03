@@ -60,10 +60,7 @@ jobs:
           TCDD_MIN_TIME: "17:02"
         run: python tcdd_monitor.py
 
-      - name: Bildirim durumunu kaydet
-        if: always()
-        run: |
-          run: test -f state.json || echo '{"last_signature": ""}' > state.json
+
 
       - name: Durum önbelleğini sakla
         if: always()
