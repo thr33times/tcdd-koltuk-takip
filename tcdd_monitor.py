@@ -339,16 +339,35 @@ def inspect_trains(page: Page) -> list[dict[str, Any]]:
 
 def format_message(items: list[dict[str, Any]]) -> str:
     lines = [
-        "🚄 TCDD normal koltuk bulundu!",
+        "🚄 TCDD koltuk bulundu!",
         f"{ORIGIN} → {DESTINATION}",
         f"Tarih: {TRAVEL_DATE}",
         "",
     ]
+
+    grouped: dict[tuple[str, str], dict[str, int]] = {}
+
     for item in items:
+        key = (item["departure"], item["train"])
+
+        if key not in grouped:
+            grouped[key] = {}
+
+        grouped[key][item["class"]] = item["count"]
+
+    for (departure, train), classes in grouped.items():
+        seat_parts: list[str] = []
+
+        if classes.get("Ekonomi", 0) > 0:
+            seat_parts.append(f"Ekonomi: {classes['Ekonomi']}")
+
+        if classes.get("Business", 0) > 0:
+            seat_parts.append(f"Business: {classes['Business']}")
+
         lines.append(
-            f"• {item['departure']} — YHT {item['train']} — "
-            f"{item['class']}: {item['count']} normal koltuk"
+            f"• {departure} — YHT {train} — {', '.join(seat_parts)}"
         )
+
     lines.extend(
         [
             "",
@@ -356,6 +375,7 @@ def format_message(items: list[dict[str, Any]]) -> str:
             "Bileti hemen TCDD E-Bilet uygulamasından kontrol et.",
         ]
     )
+
     return "\n".join(lines)
 
 
@@ -425,7 +445,11 @@ def main() -> int:
             context.close()
             browser.close()
 
-    signature = json.dumps(available, ensure_ascii=False, sort_keys=True)
+    signature = "format-v2|" + json.dumps(
+    available,
+    ensure_ascii=False,
+    sort_keys=True,
+    )
     previous_signature = load_state().get("last_signature", "")
 
     if available and signature != previous_signature:
