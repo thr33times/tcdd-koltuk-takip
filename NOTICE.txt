@@ -1,0 +1,10 @@
+NOTICE
+
+The TCDD page selectors and interaction approach were informed by the
+open-source project:
+
+mcagriaksoy/tcdd-bilet-yer-kontrol
+https://github.com/mcagriaksoy/tcdd-bilet-yer-kontrol
+
+That project is licensed under GPL-3.0. This package contains independently
+written monitoring code and includes this attribution for transparency.
