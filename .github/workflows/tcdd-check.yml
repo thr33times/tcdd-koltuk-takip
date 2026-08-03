@@ -57,7 +57,7 @@ jobs:
           TCDD_ORIGIN: "İZMİT YHT"
           TCDD_DESTINATION: "ANKARA GAR"
           TCDD_DATE: "09.08.2026"
-          TCDD_MIN_TIME: "12:30"
+          TCDD_MIN_TIME: "17:00"
         run: python tcdd_monitor.py
 
 
