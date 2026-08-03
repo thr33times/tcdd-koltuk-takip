@@ -62,7 +62,8 @@ jobs:
 
       - name: Bildirim durumunu kaydet
         if: always()
-        run: test -f state.json || echo '{"last_signature": ""}' > state.json
+        run: |
+          test -f state.json || echo '{"last_signature": ""}' > state.json
 
       - name: Durum önbelleğini sakla
         if: always()
