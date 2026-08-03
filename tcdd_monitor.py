@@ -128,6 +128,48 @@ def select_station(page: Page, input_selector: str, text: str, suggestion_prefix
     suggestion.click()
 
 
+
+def wait_for_loading_to_finish(page: Page, timeout_ms: int = 25_000) -> None:
+    """
+    Wait until TCDD's full-page loading overlay no longer blocks clicks.
+    The overlay can remain active for several seconds after expanding a train.
+    """
+    try:
+        page.wait_for_function(
+            """() => {
+                const overlays = Array.from(
+                    document.querySelectorAll('.vld-overlay.is-active')
+                );
+                return overlays.length === 0 || overlays.every((element) => {
+                    const style = window.getComputedStyle(element);
+                    return style.display === 'none'
+                        || style.visibility === 'hidden'
+                        || style.opacity === '0';
+                });
+            }""",
+            timeout=timeout_ms,
+        )
+    except PlaywrightTimeoutError:
+        # Save a clearer error instead of allowing an unrelated click timeout.
+        raise RuntimeError(
+            "TCDD yükleme ekranı 25 saniye içinde kapanmadı."
+        )
+
+
+def click_train_card(page: Page, locator: Locator) -> None:
+    """Click a train card only after the loading overlay has disappeared."""
+    wait_for_loading_to_finish(page)
+    locator.scroll_into_view_if_needed(timeout=10_000)
+
+    try:
+        locator.click(timeout=12_000)
+    except PlaywrightTimeoutError:
+        # One retry is useful when the site briefly redraws the card.
+        wait_for_loading_to_finish(page)
+        locator.click(timeout=12_000, force=True)
+
+    wait_for_loading_to_finish(page)
+
 def select_travel_date(page: Page, date_text: str) -> None:
     target = datetime.strptime(date_text, "%d.%m.%Y")
     today_tr = datetime.now(ZoneInfo("Europe/Istanbul")).date()
@@ -252,14 +294,25 @@ def inspect_trains(page: Page) -> list[dict[str, Any]]:
         train_number_match = re.search(r"YHT\s*:\s*(\d+)", card_text, re.IGNORECASE)
         train_number = train_number_match.group(1) if train_number_match else "Bilinmiyor"
 
-        # Expand the train card.
-        try:
-            departure_locator.click(timeout=5000)
-        except Exception:
-            train_button.click(timeout=5000)
-        page.wait_for_timeout(700)
+        print(
+            f"Kontrol ediliyor: {departure} — YHT {train_number}",
+            flush=True,
+        )
 
+        # Expand the train card. TCDD shows a full-page loading overlay while
+        # fetching Economy/Business details, so wait for it before and after.
+        try:
+            click_train_card(page, departure_locator)
+        except Exception:
+            click_train_card(page, train_button)
+
+        page.wait_for_timeout(400)
         class_counts = class_details_for_row(page, row)
+        print(
+            f"Sonuç: Ekonomi={class_counts['EKONOMI']}, "
+            f"Business={class_counts['BUSINESS']}",
+            flush=True,
+        )
 
         for class_name, count in class_counts.items():
             if count > 0:
@@ -274,10 +327,12 @@ def inspect_trains(page: Page) -> list[dict[str, Any]]:
 
         # Collapse before inspecting the next card when possible.
         try:
-            train_button.click(timeout=2500)
-            page.wait_for_timeout(250)
+            click_train_card(page, train_button)
+            page.wait_for_timeout(200)
         except Exception:
-            pass
+            # A failed collapse is harmless; the next click still waits for
+            # the site's loading overlay to finish.
+            wait_for_loading_to_finish(page)
 
     return available
 
